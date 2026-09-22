@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+:root {
+  --sand: #e8e0d4;
+  --sand-deep: #d9cfc0;
+  --paper: #f7f3ec;
+  --ink: #1c1916;
+  --ochre: #b8860b;
+  --ochre-soft: #d4a84b;
+  --mist: #9aa3a0;
+  --background: var(--paper);
+  --foreground: var(--ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), Georgia, serif;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--ochre) 35%, white);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.9s ease both;
+}
+
+.animate-fade-in {
+  animation: fade-in 1.1s ease both;
+}
+
+.product-card {
+  animation: fade-up 0.7s ease both;
+}
+
+.hero-grain {
+  background-image:
+    radial-gradient(ellipse at 20% 20%, rgba(184, 134, 11, 0.12), transparent 50%),
+    radial-gradient(ellipse at 80% 60%, rgba(28, 25, 22, 0.08), transparent 45%),
+    linear-gradient(160deg, #cfc4b4 0%, #e8e0d4 45%, #b8aea0 100%);
+}
