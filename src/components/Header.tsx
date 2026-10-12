@@ -3,73 +3,103 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "./CartProvider";
+import { useWishlist } from "./WishlistProvider";
+import { Logo } from "./Logo";
 
 const links = [
   { href: "/shop", label: "Shop" },
-  { href: "/about", label: "About" },
+  { href: "/about", label: "Our Story" },
+  { href: "/reviews", label: "Reviews" },
 ];
 
-export function Header() {
+export function Header({ logoSrc }: { logoSrc?: string }) {
   const { itemCount } = useCart();
+  const { count: wishCount } = useWishlist();
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="absolute inset-x-0 top-0 z-40">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 md:px-8">
-        <Link
-          href="/"
-          className="font-[family-name:var(--font-display)] text-xl tracking-tight text-[var(--ink)] md:text-2xl"
-        >
-          Akruti Home Decor
-        </Link>
+    <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--surface)]/95 backdrop-blur-sm">
+      <div className="container-x flex items-center justify-between gap-3 py-2.5 sm:gap-4 sm:py-3">
+        <Logo priority size="md" src={logoSrc} />
 
-        <nav className="hidden items-center gap-8 md:flex">
+        {/* Desktop nav from lg up — tablets use the hamburger */}
+        <nav className="hidden items-center gap-6 lg:flex xl:gap-8">
           {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
-              className="text-sm tracking-wide text-[var(--ink)]/80 transition hover:text-[var(--ochre)]"
+              prefetch
+              className="text-[12px] font-medium uppercase tracking-[0.16em] text-[var(--muted)] transition-colors hover:text-[var(--ink)]"
             >
               {l.label}
             </Link>
           ))}
           <Link
-            href="/cart"
-            className="relative text-sm tracking-wide text-[var(--ink)]"
+            href="/wishlist"
+            prefetch
+            className="text-[12px] font-medium uppercase tracking-[0.16em] text-[var(--ink)]"
           >
-            Cart
-            {itemCount > 0 && (
-              <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--ochre)] px-1 text-[11px] font-medium text-white">
-                {itemCount}
-              </span>
-            )}
+            Wishlist{wishCount > 0 ? ` (${wishCount})` : ""}
+          </Link>
+          <Link
+            href="/cart"
+            prefetch
+            className="text-[12px] font-medium uppercase tracking-[0.16em] text-[var(--ink)]"
+          >
+            Cart{itemCount > 0 ? ` (${itemCount})` : ""}
           </Link>
         </nav>
 
-        <button
-          type="button"
-          className="md:hidden text-sm text-[var(--ink)]"
-          onClick={() => setOpen((v) => !v)}
-          aria-label="Menu"
-        >
-          {open ? "Close" : "Menu"}
-        </button>
+        <div className="flex items-center gap-1 lg:hidden">
+          <Link
+            href="/wishlist"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-[11px] uppercase tracking-[0.12em] text-[var(--ink)]"
+          >
+            Wish{wishCount > 0 ? ` (${wishCount})` : ""}
+          </Link>
+          <Link
+            href="/cart"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-[11px] uppercase tracking-[0.12em] text-[var(--ink)]"
+          >
+            Cart{itemCount > 0 ? ` (${itemCount})` : ""}
+          </Link>
+          <button
+            type="button"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-[11px] uppercase tracking-[0.12em]"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-label={open ? "Close menu" : "Open menu"}
+          >
+            {open ? "Close" : "Menu"}
+          </button>
+        </div>
       </div>
 
       {open && (
-        <div className="border-t border-[var(--ink)]/10 bg-[var(--sand)]/95 px-5 py-4 backdrop-blur md:hidden">
-          <div className="flex flex-col gap-3">
+        <div className="border-t border-[var(--line)] bg-[var(--surface)] lg:hidden">
+          <div className="container-x flex flex-col gap-1 py-3">
             {links.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="text-[var(--ink)]"
+                className="flex min-h-12 items-center text-sm uppercase tracking-[0.12em]"
               >
                 {l.label}
               </Link>
             ))}
-            <Link href="/cart" onClick={() => setOpen(false)}>
+            <Link
+              href="/wishlist"
+              onClick={() => setOpen(false)}
+              className="flex min-h-12 items-center text-sm uppercase tracking-[0.12em]"
+            >
+              Wishlist ({wishCount})
+            </Link>
+            <Link
+              href="/cart"
+              onClick={() => setOpen(false)}
+              className="flex min-h-12 items-center text-sm uppercase tracking-[0.12em]"
+            >
               Cart ({itemCount})
             </Link>
           </div>

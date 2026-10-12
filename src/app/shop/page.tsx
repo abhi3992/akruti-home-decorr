@@ -1,61 +1,46 @@
+import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
-import { ProductCard } from "@/components/ProductCard";
-import { ShopFilters } from "@/components/ShopFilters";
+import { ShopCatalog } from "@/components/ShopCatalog";
+import { getCatalog } from "@/lib/catalog";
 
-export const dynamic = "force-dynamic";
+/** Long ISR window — served from CDN; admin edits still bust cache via revalidatePath */
+export const revalidate = 3600;
 export const metadata = { title: "Shop" };
 
-type SearchParams = Promise<{ fabric?: string; size?: string }>;
-
-export default async function ShopPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
-  const params = await searchParams;
-  const products = await prisma.product.findMany({ orderBy: { name: "asc" } });
-
-  const filtered = products.filter((p) => {
-    if (params.fabric && p.fabric !== params.fabric) return false;
-    if (params.size) {
-      try {
-        const sizes: string[] = JSON.parse(p.sizes);
-        if (!sizes.includes(params.size)) return false;
-      } catch {
-        return false;
-      }
-    }
-    return true;
-  });
+export default async function ShopPage() {
+  const [products, catalog] = await Promise.all([
+    prisma.product.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        priceInPaise: true,
+        images: true,
+        fabric: true,
+        sizes: true,
+        category: true,
+        subcategory: true,
+      },
+    }),
+    getCatalog(),
+  ]);
 
   return (
-    <div className="mx-auto max-w-6xl px-5 pb-24 pt-28 md:px-8">
-      <div className="mb-10">
-        <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink)]/50">
-          Collection
-        </p>
-        <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl md:text-5xl">
-          Shop robes
-        </h1>
+    <div className="container-x pb-16 pt-8 sm:pb-20 sm:pt-10 md:pt-12">
+      <div className="mb-6 sm:mb-8">
+        <p className="eyebrow">Collection</p>
+        <h1 className="section-title mt-2">Shop all</h1>
       </div>
 
-      <ShopFilters
-        fabric={params.fabric}
-        size={params.size}
-        count={filtered.length}
-      />
-
-      <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4 md:gap-x-6">
-        {filtered.map((p, i) => (
-          <ProductCard key={p.id} {...p} index={i} />
-        ))}
-      </div>
-
-      {filtered.length === 0 && (
-        <p className="mt-16 text-center text-[var(--ink)]/60">
-          No products match these filters.
-        </p>
-      )}
+      <Suspense
+        fallback={
+          <p className="py-8 text-sm text-[var(--muted)]">Loading shop…</p>
+        }
+      >
+        <ShopCatalog products={products} catalog={catalog} />
+      </Suspense>
     </div>
   );
 }

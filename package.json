@@ -19,6 +19,7 @@
     "@neon/config": "^1.7.2",
     "@neon/env": "^1.4.3",
     "@prisma/client": "^5.22.0",
+    "@vercel/blob": "^2.8.0",
     "next": "15.5.25",
     "razorpay": "^2.9.8",
     "react": "19.1.0",

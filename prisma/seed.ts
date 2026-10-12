@@ -9,7 +9,7 @@ const products = [
     description:
       "Soft waffle cotton wrap robe with airplanes, hot air balloons, and clouds. Contrast geometric trim on collar, cuffs, and pockets.",
     priceInPaise: 189900,
-    images: JSON.stringify(["/products/sky-voyage.png"]),
+    images: JSON.stringify(["/products/sky-voyage.jpg"]),
     fabric: "Waffle Cotton",
     sizes: JSON.stringify(["2-3Y", "4-5Y", "6-7Y", "8-9Y"]),
     stock: 25,
@@ -21,7 +21,7 @@ const products = [
     description:
       "Playful waffle cotton robe with elephants, giraffes, and cacti — a cheerful hand-print look for everyday loungewear.",
     priceInPaise: 189900,
-    images: JSON.stringify(["/products/safari-friends.png"]),
+    images: JSON.stringify(["/products/safari-friends.jpg"]),
     fabric: "Waffle Cotton",
     sizes: JSON.stringify(["2-3Y", "4-5Y", "6-7Y", "8-9Y"]),
     stock: 22,
@@ -33,7 +33,7 @@ const products = [
     description:
       "Dreamy pink whales and crescent moons on absorbent waffle cotton, finished with wavy pink trim.",
     priceInPaise: 179900,
-    images: JSON.stringify(["/products/whale-dream.png"]),
+    images: JSON.stringify(["/products/whale-dream.jpg"]),
     fabric: "Waffle Cotton",
     sizes: JSON.stringify(["2-3Y", "4-5Y", "6-7Y", "8-9Y"]),
     stock: 20,
@@ -45,8 +45,8 @@ const products = [
     description:
       "Quilted kantha-style robe with tigers, birds, and palms. Mustard border trim for a bold artisanal finish.",
     priceInPaise: 219900,
-    images: JSON.stringify(["/products/jungle-kantha.png"]),
-    fabric: "Kantha Cotton",
+    images: JSON.stringify(["/products/jungle-kantha.jpg"]),
+    fabric: "Percale Cotton",
     sizes: JSON.stringify(["2-3Y", "4-5Y", "6-7Y", "8-9Y"]),
     stock: 18,
     featured: true,
@@ -57,7 +57,7 @@ const products = [
     description:
       "Teal and ochre dinosaurs on waffle cotton with mustard geometric trim — made for little explorers.",
     priceInPaise: 189900,
-    images: JSON.stringify(["/products/dino-adventure.png"]),
+    images: JSON.stringify(["/products/dino-adventure.jpg"]),
     fabric: "Waffle Cotton",
     sizes: JSON.stringify(["2-3Y", "4-5Y", "6-7Y", "8-9Y"]),
     stock: 24,
@@ -69,7 +69,7 @@ const products = [
     description:
       "Bright hot air balloons, clouds, and stars on waffle cotton with sunny yellow trim.",
     priceInPaise: 189900,
-    images: JSON.stringify(["/products/balloon-sky.png"]),
+    images: JSON.stringify(["/products/balloon-sky.jpg"]),
     fabric: "Waffle Cotton",
     sizes: JSON.stringify(["2-3Y", "4-5Y", "6-7Y", "8-9Y"]),
     stock: 21,
@@ -81,7 +81,7 @@ const products = [
     description:
       "Royal blue elephants and palm trees on soft waffle cotton — a classic Jaipur-inspired print for kids.",
     priceInPaise: 189900,
-    images: JSON.stringify(["/products/indigo-elephant.png"]),
+    images: JSON.stringify(["/products/indigo-elephant.jpg"]),
     fabric: "Waffle Cotton",
     sizes: JSON.stringify(["2-3Y", "4-5Y", "6-7Y", "8-9Y"]),
     stock: 23,
@@ -93,7 +93,7 @@ const products = [
     description:
       "Pink elephants, giraffes, and monkeys on waffle cotton with bright yellow binding.",
     priceInPaise: 189900,
-    images: JSON.stringify(["/products/carnival-critters.png"]),
+    images: JSON.stringify(["/products/carnival-critters.jpg"]),
     fabric: "Waffle Cotton",
     sizes: JSON.stringify(["2-3Y", "4-5Y", "6-7Y", "8-9Y"]),
     stock: 20,
@@ -105,8 +105,8 @@ const products = [
     description:
       "Quilted kantha robe with pink elephants, palms, and strawberries. Pink-stripe collar and belt.",
     priceInPaise: 219900,
-    images: JSON.stringify(["/products/berry-elephant.png"]),
-    fabric: "Kantha Cotton",
+    images: JSON.stringify(["/products/berry-elephant.jpg"]),
+    fabric: "Percale Cotton",
     sizes: JSON.stringify(["2-3Y", "4-5Y", "6-7Y", "8-9Y"]),
     stock: 16,
     featured: true,

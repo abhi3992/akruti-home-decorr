@@ -1,158 +1,201 @@
 import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getSiteImages, getSiteContent } from "@/lib/site-settings";
+import { isExternalImage } from "@/lib/utils";
 import { ProductCard } from "@/components/ProductCard";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export default async function HomePage() {
-  const featured = await prisma.product.findMany({
-    where: { featured: true },
-    take: 4,
-    orderBy: { name: "asc" },
-  });
+  const [products, images, content] = await Promise.all([
+    prisma.product.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      take: 8,
+    }),
+    getSiteImages(),
+    getSiteContent(),
+  ]);
+  const loved = products.filter((p) => p.featured).slice(0, 4);
+  const rest = products.slice(0, 4);
 
   return (
     <>
-      <section className="relative min-h-[100svh] overflow-hidden">
-        <div className="absolute inset-0 hero-grain" />
-        <Image
-          src="/products/sky-voyage.png"
-          alt="Akruti kids robe"
-          fill
-          priority
-          className="object-cover object-[70%_center] opacity-90 animate-fade-in"
-          sizes="100vw"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[var(--sand)]/90 via-[var(--sand)]/55 to-transparent" />
-
-        <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-5 pb-16 pt-28 md:justify-center md:px-8 md:pb-24">
-          <p className="animate-fade-up text-xs uppercase tracking-[0.22em] text-[var(--ink)]/60">
-            Kids robes · Hand-printed cotton
-          </p>
-          <h1 className="animate-fade-up mt-3 max-w-xl font-[family-name:var(--font-display)] text-5xl leading-[1.05] text-[var(--ink)] md:text-7xl"
-            style={{ animationDelay: "120ms" }}
-          >
-            Akruti Home Decor
-          </h1>
-          <p
-            className="animate-fade-up mt-4 max-w-md text-base leading-relaxed text-[var(--ink)]/75 md:text-lg"
-            style={{ animationDelay: "220ms" }}
-          >
-            Soft waffle and kantha robes with playful prints — made for little
-            mornings and quiet evenings.
-          </p>
-          <div
-            className="animate-fade-up mt-8 flex flex-wrap gap-3"
-            style={{ animationDelay: "320ms" }}
-          >
-            <Link
-              href="/shop"
-              className="bg-[var(--ink)] px-7 py-3.5 text-sm tracking-wide text-white transition hover:bg-[var(--ochre)]"
-            >
-              Shop the collection
-            </Link>
-            <Link
-              href="/about"
-              className="border border-[var(--ink)]/25 bg-white/40 px-7 py-3.5 text-sm tracking-wide text-[var(--ink)] backdrop-blur transition hover:border-[var(--ochre)]"
-            >
-              Our story
-            </Link>
+      <section className="relative isolate overflow-hidden bg-[var(--ink)]">
+        {/* Match desktop photo framing (≈16:9) so the full AKRUTI mark stays in view */}
+        <div className="relative aspect-[16/9] w-full md:aspect-auto md:min-h-[78svh]">
+          <Image
+            src={images.heroImage}
+            alt="Akruti handblock textiles"
+            fill
+            priority
+            quality={88}
+            className="object-cover object-[50%_42%]"
+            sizes="100vw"
+            unoptimized={isExternalImage(images.heroImage)}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent md:bg-gradient-to-r md:from-black/65 md:via-black/35 md:to-transparent" />
+          {/* Keep copy on the LEFT so it never sits on the logo painted on the right */}
+          <div className="container-x absolute inset-0 z-10 flex flex-col justify-end pb-5 pt-8 sm:pb-7 md:justify-center md:pb-24 md:pt-20">
+            <div className="max-w-[58%] sm:max-w-md md:max-w-xl">
+              <p className="text-[9px] uppercase tracking-[0.18em] text-white/85 sm:text-[10px] md:text-[11px] md:tracking-[0.2em]">
+                {content.heroEyebrow}
+              </p>
+              <h1 className="mt-1.5 font-[family-name:var(--font-display)] text-[1.25rem] leading-[1.15] text-white sm:mt-2 sm:text-3xl md:mt-4 md:text-6xl">
+                {content.heroTitle}
+              </h1>
+              <p className="mt-1.5 hidden text-sm leading-relaxed text-white/90 sm:mt-2 sm:block md:mt-4 md:text-base">
+                {content.heroSubtitle}
+              </p>
+              <div className="mt-3 flex flex-row items-center gap-2 sm:mt-5 sm:gap-3 md:mt-8">
+                <Link
+                  href="/shop"
+                  className="btn btn-dark min-h-9 px-3 py-2 text-center text-[9px] tracking-[0.1em] text-[var(--ink)] bg-white hover:bg-[var(--accent)] hover:text-white sm:min-h-10 sm:px-4 sm:text-[11px] md:min-h-12 md:px-6 md:text-[0.8rem]"
+                >
+                  Shop collection
+                </Link>
+                <Link
+                  href="/about"
+                  className="btn min-h-9 border border-white/90 px-3 py-2 text-center text-[9px] tracking-[0.1em] text-white hover:bg-white hover:text-[var(--ink)] sm:min-h-10 sm:px-4 sm:text-[11px] md:min-h-12 md:px-6 md:text-[0.8rem]"
+                >
+                  Our story
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-5 py-20 md:px-8 md:py-28">
-        <div className="mb-10 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink)]/50">
-              New arrival
-            </p>
-            <h2 className="mt-2 font-[family-name:var(--font-display)] text-3xl md:text-4xl">
-              Featured robes
+      <section className="container-x py-12 sm:py-14 md:py-20">
+        <div className="mb-5 flex items-end justify-between gap-3 md:mb-8">
+          <div className="min-w-0">
+            <p className="eyebrow">Most loved</p>
+            <h2 className="section-title mt-1.5 text-[1.55rem] sm:text-[1.75rem] md:mt-2 md:text-[length:inherit]">
+              Customer favourites
             </h2>
           </div>
           <Link
             href="/shop"
-            className="text-sm text-[var(--ochre)] hover:underline"
+            className="shrink-0 pb-0.5 text-xs text-[var(--accent)] hover:underline md:text-sm"
           >
             View all
           </Link>
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-4 md:gap-x-6">
-          {featured.map((p, i) => (
-            <ProductCard key={p.id} {...p} index={i} />
+        <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-4 sm:gap-y-8 md:grid-cols-4 md:gap-5">
+          {(loved.length ? loved : rest).map((p) => (
+            <ProductCard key={p.id} {...p} />
           ))}
         </div>
       </section>
 
-      <section className="bg-[var(--sand-deep)]/60">
-        <div className="mx-auto grid max-w-6xl gap-10 px-5 py-20 md:grid-cols-2 md:items-center md:px-8 md:py-28">
-          <div className="relative aspect-[4/5] overflow-hidden">
+      <section className="bg-[var(--bg)] py-10 sm:py-12 md:py-20">
+        <div className="container-x grid items-center gap-6 md:grid-cols-2 md:gap-14">
+          <div className="relative -mx-4 aspect-[4/5] overflow-hidden bg-[var(--line)] sm:mx-0 sm:aspect-[3/4]">
             <Image
-              src="/products/jungle-kantha.png"
-              alt="Kantha robe detail"
+              src={images.homeStoryImage}
+              alt="Akruti handblock textile"
               fill
-              className="object-cover"
+              quality={80}
+              className="object-cover object-center"
               sizes="(max-width:768px) 100vw, 50vw"
+              unoptimized={isExternalImage(images.homeStoryImage)}
             />
           </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink)]/50">
-              About us
-            </p>
-            <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl md:text-4xl">
-              Prints with personality
+          <div className="prose-story space-y-3.5 md:space-y-5">
+            <p className="eyebrow">{content.homeStoryEyebrow}</p>
+            <h2 className="section-title text-[1.55rem] sm:text-[1.75rem]">
+              {content.homeStoryTitle}{" "}
+              <span className="italic text-[var(--accent)]">
+                {content.homeStoryTitleAccent}
+              </span>
             </h2>
-            <p className="mt-4 max-w-md leading-relaxed text-[var(--ink)]/75">
-              Akruti Home Decor brings artisanal textile craft into kids&apos;
-              everyday wear — absorbent cottons, cheerful motifs, and careful
-              finishing you can feel.
+            <p>{content.homeStoryP1}</p>
+            <p className="pull text-[1.1rem] md:text-[1.25rem]">
+              {content.homeStoryPull}
             </p>
-            <Link
-              href="/about"
-              className="mt-6 inline-block text-sm text-[var(--ochre)] hover:underline"
-            >
-              Read more
+            <p className="hidden sm:block">{content.homeStoryP2}</p>
+            <Link href="/about" className="btn btn-outline mt-2 w-full sm:w-auto">
+              Read our full story
             </Link>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-5 py-20 md:px-8 md:py-28">
-        <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink)]/50">
-          Customer reviews
-        </p>
-        <h2 className="mt-2 font-[family-name:var(--font-display)] text-3xl">
-          Hear from them
-        </h2>
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
-          {[
-            {
-              title: "Just right",
-              body: "The waffle robe is so soft and the print looks exactly like the photos. Fast delivery too.",
-            },
-            {
-              title: "Gift hit",
-              body: "Bought the kantha jungle print for my niece — she refuses to take it off after bath time.",
-            },
-            {
-              title: "Quality stitch",
-              body: "Trim and pockets feel sturdy. Finally kids loungewear that looks curated, not cartoonish.",
-            },
-          ].map((r) => (
-            <blockquote
-              key={r.title}
-              className="border-t border-[var(--ink)]/15 pt-6"
+      <section className="bg-[var(--surface)]">
+        <div className="container-x py-10 sm:py-12 md:py-20">
+          <div className="mb-5 flex items-end justify-between gap-3 md:mb-8">
+            <div className="min-w-0">
+              <p className="eyebrow">Shop</p>
+              <h2 className="section-title mt-1.5 text-[1.55rem] sm:text-[1.75rem]">
+                New from the workshop
+              </h2>
+            </div>
+            <Link
+              href="/shop"
+              className="shrink-0 text-xs text-[var(--accent)] hover:underline md:text-sm"
             >
-              <p className="font-[family-name:var(--font-display)] text-xl">
-                {r.title}
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-[var(--ink)]/70">
-                {r.body}
-              </p>
-            </blockquote>
-          ))}
+              Browse all
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-4 sm:gap-y-8 md:grid-cols-4 md:gap-5">
+            {rest.map((p) => (
+              <ProductCard key={p.id} {...p} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-[var(--line)] bg-[var(--bg)] py-10 sm:py-12 md:py-20">
+        <div className="container-x grid items-center gap-6 md:grid-cols-2 md:gap-14">
+          <div className="relative -mx-4 order-1 aspect-[4/5] overflow-hidden bg-[var(--line)] sm:mx-0 sm:aspect-[3/4] md:order-2">
+            <Image
+              src={images.founderImage}
+              alt="Shruti Koolwal, Founder of Akruti Home Decor"
+              fill
+              quality={90}
+              className="object-cover object-[center_15%]"
+              sizes="(max-width:768px) 100vw, 50vw"
+              unoptimized={isExternalImage(images.founderImage)}
+            />
+          </div>
+          <div className="prose-story order-2 space-y-3.5 md:order-1 md:space-y-5">
+            <p className="eyebrow">{content.founderEyebrow}</p>
+            <h2 className="section-title text-[1.55rem] sm:text-[1.75rem]">
+              {content.founderTitle}{" "}
+              <span className="italic text-[var(--accent)]">
+                {content.founderTitleAccent}
+              </span>
+            </h2>
+            <p>{content.founderP1}</p>
+            <p className="hidden sm:block">{content.founderP2}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              {content.founderTagline}
+            </p>
+            <Link
+              href="/about#founder"
+              className="btn btn-outline mt-1 w-full sm:w-auto"
+            >
+              Meet Shruti
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-[var(--line)] bg-[var(--surface)] py-10 text-center sm:py-12 md:py-14">
+        <div className="container-x max-w-2xl">
+          <h2 className="section-title text-[1.55rem] sm:text-[1.75rem]">
+            {content.ctaTitle}
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-[var(--muted)] md:mt-4 md:text-base">
+            {content.ctaBody}
+          </p>
+          <Link
+            href="/shop"
+            className="btn btn-dark mt-6 min-h-12 w-full sm:mt-8 sm:w-auto"
+          >
+            Shop now
+          </Link>
         </div>
       </section>
     </>

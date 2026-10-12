@@ -1,52 +1,84 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Logo } from "@/components/Logo";
+import { getSiteImages, getSiteContent } from "@/lib/site-settings";
+import { isExternalImage } from "@/lib/utils";
 
-export const metadata = { title: "About" };
+export const metadata = { title: "Our Story" };
+export const revalidate = 3600;
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const [images, content] = await Promise.all([
+    getSiteImages(),
+    getSiteContent(),
+  ]);
+
   return (
-    <div className="mx-auto max-w-6xl px-5 pb-24 pt-28 md:px-8">
-      <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink)]/50">
-        Our background
-      </p>
-      <h1 className="mt-2 max-w-2xl font-[family-name:var(--font-display)] text-4xl md:text-5xl">
-        Akruti Home Decor
-      </h1>
-
-      <div className="mt-12 grid gap-10 md:grid-cols-2 md:items-start">
-        <div className="relative aspect-[4/5] overflow-hidden">
-          <Image
-            src="/products/berry-elephant.png"
-            alt="Akruti product"
-            fill
-            className="object-cover"
-            sizes="(max-width:768px) 100vw, 50vw"
-          />
+    <>
+      <section className="border-b border-[var(--line)] bg-[var(--surface)] py-8 md:py-12">
+        <div className="container-x flex flex-col items-center px-1 text-center">
+          <Logo href={null} size="lg" src={images.logoImage} />
+          <p className="mt-4 max-w-xl text-sm text-[var(--muted)] md:mt-5 md:text-base">
+            {content.aboutIntro}
+          </p>
         </div>
-        <div className="space-y-5 text-[var(--ink)]/80 leading-relaxed">
-          <p>
-            At Akruti Home Decor, we craft home textiles and kids loungewear
-            with personality — soft cottons, cheerful prints, and finishes that
-            feel thoughtfully made.
-          </p>
-          <p>
-            Our kids robe collection pairs absorbent waffle and quilted kantha
-            fabrics with playful motifs: elephants, balloons, dinosaurs, and
-            seaside dreams. Each piece is designed to look as good hanging by
-            the bath as it feels wrapped up after.
-          </p>
-          <p>
-            We believe everyday comfort can still be beautiful. Shop with us
-            for gifts, gifting sets, and pieces that grow with your home.
-          </p>
-          <Link
-            href="/shop"
-            className="inline-block bg-[var(--ink)] px-6 py-3 text-sm text-white transition hover:bg-[var(--ochre)]"
-          >
-            Explore the shop
+      </section>
+
+      <section className="container-x prose-story max-w-3xl space-y-4 py-10 md:space-y-5 md:py-16">
+        <p className="eyebrow">{content.aboutEyebrow}</p>
+        <h1 className="section-title">
+          {content.aboutTitle}{" "}
+          <span className="italic text-[var(--accent)]">
+            {content.aboutTitleAccent}
+          </span>
+        </h1>
+        <p>{content.aboutP1}</p>
+        <p className="pull">{content.aboutPull}</p>
+        <p>{content.aboutP2}</p>
+        <p>{content.aboutP3}</p>
+        <p>{content.aboutP4}</p>
+      </section>
+
+      <section
+        id="founder"
+        className="scroll-mt-24 border-y border-[var(--line)] bg-[var(--bg)] py-12 md:py-16"
+      >
+        <div className="container-x grid items-center gap-8 md:grid-cols-2 md:gap-14">
+          <div className="prose-story space-y-4 md:space-y-5">
+            <p className="eyebrow">{content.founderEyebrow}</p>
+            <h2 className="section-title">
+              {content.founderTitle}{" "}
+              <span className="italic text-[var(--accent)]">
+                {content.founderTitleAccent}
+              </span>
+            </h2>
+            <p>{content.founderP1}</p>
+            <p>{content.founderP2}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              {content.founderTagline}
+            </p>
+          </div>
+          <div className="relative aspect-[3/4] overflow-hidden bg-[var(--line)]">
+            <Image
+              src={images.founderImage}
+              alt="Shruti Koolwal, Founder of Akruti Home Decor"
+              fill
+              quality={94}
+              className="object-cover object-top"
+              sizes="(max-width:768px) 100vw, 50vw"
+              unoptimized={isExternalImage(images.founderImage)}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="py-10 text-center md:py-14">
+        <div className="container-x">
+          <Link href="/shop" className="btn btn-dark w-full sm:w-auto">
+            Shop the collection
           </Link>
         </div>
-      </div>
-    </div>
+      </section>
+    </>
   );
 }

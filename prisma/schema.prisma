@@ -18,15 +18,25 @@ model Product {
   images       String
   fabric       String
   sizes        String
+  /// bathrobe | towel | bedsheet, or a category added in admin
+  category     String      @default("towel")
+  subcategory  String      @default("")
   stock        Int         @default(20)
   featured     Boolean     @default(false)
+  active       Boolean     @default(true)
+  viewCount    Int         @default(0)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
-  orderItems   OrderItem[]
+  orderItems    OrderItem[]
+  cartItems     CartPresence[]
+  wishlistItems WishlistPresence[]
+  reviews       Review[]
+  events        ProductEvent[]
 }
 
 model Order {
   id                String      @id @default(cuid())
+  orderNumber       String?     @unique
   customerName      String
   customerEmail     String
   customerPhone     String
@@ -39,9 +49,13 @@ model Order {
   totalInPaise      Int
   razorpayOrderId   String?
   razorpayPaymentId String?
+  trackingId        String      @default("")
+  trackingUrl       String      @default("")
+  shippedAt         DateTime?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   items             OrderItem[]
+  reviews           Review[]
 }
 
 model OrderItem {
@@ -51,6 +65,70 @@ model OrderItem {
   size           String
   quantity       Int
   unitPricePaise Int
+  /// Optional name printed on towels/bathrobes (+₹100 when set)
+  customName     String  @default("")
+  /// flat | elastic | deep on bedsheets
+  sheetFit       String  @default("")
+  /// Mattress length × width × height for fitted sheets
+  mattress       String  @default("")
   order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product        Product @relation(fields: [productId], references: [id])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  orderId   String?
+  author    String
+  rating    Int
+  body      String
+  /// Customer photo, only when it is this product
+  image     String   @default("")
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, productId])
+  @@index([productId])
+}
+
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+/// A product page view, cart add, or wishlist add, used for admin insights.
+model ProductEvent {
+  id        String   @id @default(cuid())
+  productId String
+  /// view | cart | wishlist
+  kind      String
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([kind, createdAt])
+  @@index([productId, createdAt])
+}
+
+/// Anonymous visitors currently holding a product in cart (synced from browser)
+model CartPresence {
+  visitorId String
+  productId String
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([visitorId, productId])
+  @@index([productId])
+}
+
+/// Anonymous visitors currently holding a product in wishlist
+model WishlistPresence {
+  visitorId String
+  productId String
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([visitorId, productId])
+  @@index([productId])
 }

@@ -38,6 +38,10 @@ yarn-error.log*
 prisma/*.db
 prisma/*.db-journal
 
+# local uploads
+/public/uploads
+
+
 # vercel
 .vercel
 
@@ -45,3 +49,6 @@ prisma/*.db-journal
 *.tsbuildinfo
 next-env.d.ts
 .neon
+
+.vercel
+.env*

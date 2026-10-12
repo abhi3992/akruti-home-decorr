@@ -2,7 +2,23 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAdminAuthenticated, clearAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
-import { formatINR } from "@/lib/utils";
+import { formatINR, productImages } from "@/lib/utils";
+import { getSiteImages, getSiteContent, SITE_IMAGES } from "@/lib/site-settings";
+import { AddProductForm } from "@/components/AddProductForm";
+import { EditProductForm } from "@/components/EditProductForm";
+import { SiteImageUploader } from "@/components/SiteImageUploader";
+import { SiteContentForm } from "@/components/SiteContentForm";
+import { AdminTabs } from "@/components/AdminTabs";
+import { RestoreProductButton } from "@/components/RestoreProductButton";
+import { ShipOrderForm } from "@/components/ShipOrderForm";
+import type { SiteImageKey } from "@/lib/site-content";
+import { displayOrderRef } from "@/lib/order-number";
+import { sendShippedEmail } from "@/lib/notify";
+import { formatLineLabel } from "@/lib/name-print";
+import { CatalogManager } from "@/components/CatalogManager";
+import { TrafficInsights } from "@/components/TrafficInsights";
+import { PruneBlobsButton } from "@/components/PruneBlobsButton";
+import { getCatalog, categoryLabelFromCatalog, subcategoryLabel } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -15,253 +31,299 @@ async function logout() {
 export default async function AdminDashboard() {
   if (!(await isAdminAuthenticated())) redirect("/admin/login");
 
-  const [products, orders] = await Promise.all([
-    prisma.product.findMany({ orderBy: { name: "asc" } }),
+  const [products, orders, images, content, catalog] = await Promise.all([
+    prisma.product.findMany({
+      orderBy: { name: "asc" },
+    }),
     prisma.order.findMany({
       orderBy: { createdAt: "desc" },
       take: 20,
-      include: { items: true },
+      include: { items: { include: { product: true } } },
     }),
+    getSiteImages(),
+    getSiteContent(),
+    getCatalog(),
   ]);
 
-  async function updateStock(formData: FormData) {
+  async function shareTracking(formData: FormData) {
     "use server";
     if (!(await isAdminAuthenticated())) redirect("/admin/login");
-    const id = String(formData.get("id"));
-    const stock = Number(formData.get("stock"));
-    const featured = formData.get("featured") === "on";
-    const priceInPaise = Math.round(Number(formData.get("price")) * 100);
-    await prisma.product.update({
-      where: { id },
-      data: { stock, featured, priceInPaise },
-    });
-    redirect("/admin");
-  }
+    const id = String(formData.get("id") || "");
+    const trackingId = String(formData.get("trackingId") || "").trim();
+    const trackingUrl = String(formData.get("trackingUrl") || "").trim();
+    if (!id || !trackingId || !trackingUrl) redirect("/admin");
 
-  async function markShipped(formData: FormData) {
-    "use server";
-    if (!(await isAdminAuthenticated())) redirect("/admin/login");
-    const id = String(formData.get("id"));
-    await prisma.order.update({
+    const updated = await prisma.order.update({
       where: { id },
-      data: { status: "shipped" },
-    });
-    redirect("/admin");
-  }
-
-  async function createProduct(formData: FormData) {
-    "use server";
-    if (!(await isAdminAuthenticated())) redirect("/admin/login");
-    const name = String(formData.get("name") || "");
-    const slug = String(formData.get("slug") || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
-    const description = String(formData.get("description") || "");
-    const priceInPaise = Math.round(Number(formData.get("price")) * 100);
-    const fabric = String(formData.get("fabric") || "Waffle Cotton");
-    const image = String(formData.get("image") || "/products/sky-voyage.png");
-    const stock = Number(formData.get("stock") || 10);
-    await prisma.product.create({
       data: {
-        name,
-        slug,
-        description,
-        priceInPaise,
-        fabric,
-        images: JSON.stringify([image]),
-        sizes: JSON.stringify(["2-3Y", "4-5Y", "6-7Y", "8-9Y"]),
-        stock,
-        featured: formData.get("featured") === "on",
+        trackingId,
+        trackingUrl,
+        status: "shipped",
+        shippedAt: new Date(),
       },
+      include: { items: { include: { product: true } } },
     });
+
+    await sendShippedEmail(
+      updated,
+      updated.items.map((item) =>
+        formatLineLabel({
+          name: item.product?.name || "Product",
+          size: item.size,
+          quantity: item.quantity,
+          customName: item.customName,
+          sheetFit: item.sheetFit,
+          mattress: item.mattress,
+        })
+      )
+    );
+
     redirect("/admin");
   }
 
-  return (
-    <div className="mx-auto max-w-6xl px-5 pb-24 pt-28 md:px-8">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="font-[family-name:var(--font-display)] text-4xl">
-          Admin
-        </h1>
-        <form action={logout}>
-          <button type="submit" className="text-sm text-[var(--ink)]/60">
-            Log out
-          </button>
-        </form>
-      </div>
+  const imageKeys = Object.keys(SITE_IMAGES) as SiteImageKey[];
+  const traffic = <TrafficInsights />;
 
-      <section className="mt-12">
+  const site = (
+    <>
+      <section>
+        <h2 className="font-[family-name:var(--font-display)] text-2xl">
+          Site images
+        </h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Upload or replace any image used across the website. Replaced photos
+          are deleted from storage. Unused leftovers can be cleared here.
+        </p>
+        <PruneBlobsButton />
+        <div className="mt-6 grid gap-4">
+          {imageKeys.map((id) => {
+            const meta = SITE_IMAGES[id];
+            return (
+              <SiteImageUploader
+                key={id}
+                settingKey={meta.key}
+                label={meta.label}
+                help={meta.help}
+                currentUrl={images[id]}
+              />
+            );
+          })}
+        </div>
+      </section>
+      <section className="mt-16">
+        <h2 className="font-[family-name:var(--font-display)] text-2xl">
+          Site text
+        </h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Announcement bar, homepage, About page, founder section, and footer.
+        </p>
+        <SiteContentForm initial={content} />
+      </section>
+    </>
+  );
+
+  const productsPanel = (
+    <>
+      <CatalogManager initial={catalog} />
+      <section>
         <h2 className="font-[family-name:var(--font-display)] text-2xl">
           Products
         </h2>
-        <div className="mt-6 overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-[var(--ink)]/15 text-[var(--ink)]/50">
-              <tr>
-                <th className="py-2 font-medium">Name</th>
-                <th className="py-2 font-medium">Price (₹)</th>
-                <th className="py-2 font-medium">Stock</th>
-                <th className="py-2 font-medium">Featured</th>
-                <th className="py-2 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => (
-                <tr key={p.id} className="border-b border-[var(--ink)]/10">
-                  <td className="py-3">
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Edit details or remove from shop. Listings in past orders are hidden
+          (not erased).
+        </p>
+        <ul className="mt-6 space-y-6">
+          {products.map((p) => {
+            const imgs = productImages(p.images);
+            return (
+              <li
+                key={p.id}
+                className="border border-[var(--line)] bg-[var(--surface)] p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
                     <Link
                       href={`/product/${p.slug}`}
-                      className="hover:text-[var(--ochre)]"
+                      className="font-medium hover:text-[var(--accent)]"
                     >
                       {p.name}
                     </Link>
-                  </td>
-                  <td className="py-3" colSpan={4}>
-                    <form
-                      action={updateStock}
-                      className="flex flex-wrap items-center gap-3"
-                    >
-                      <input type="hidden" name="id" value={p.id} />
-                      <input
-                        name="price"
-                        type="number"
-                        step="1"
-                        defaultValue={p.priceInPaise / 100}
-                        className="w-24 border border-[var(--ink)]/20 px-2 py-1"
-                      />
-                      <input
-                        name="stock"
-                        type="number"
-                        defaultValue={p.stock}
-                        className="w-20 border border-[var(--ink)]/20 px-2 py-1"
-                      />
-                      <label className="flex items-center gap-1.5 text-xs">
-                        <input
-                          type="checkbox"
-                          name="featured"
-                          defaultChecked={p.featured}
-                        />
-                        Featured
-                      </label>
-                      <button
-                        type="submit"
-                        className="text-xs text-[var(--ochre)]"
-                      >
-                        Save
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {formatINR(p.priceInPaise)} · {categoryLabelFromCatalog(catalog, p.category)}
+                      {p.subcategory
+                        ? ` · ${subcategoryLabel(catalog, p.category, p.subcategory)}`
+                        : ""}{" "}
+                      ·
+                      stock {p.stock}
+                      {p.featured ? " · featured" : ""}
+                      {!p.active ? " · hidden from shop" : ""}
+                      {imgs.length > 0
+                        ? ` · ${imgs.length} photo${imgs.length > 1 ? "s" : ""}`
+                        : ""}
+                    </p>
+                  </div>
+                  {!p.active && <RestoreProductButton id={p.id} />}
+                </div>
+                <EditProductForm
+                  catalog={catalog}
+                  product={{
+                    id: p.id,
+                    name: p.name,
+                    slug: p.slug,
+                    description: p.description,
+                    priceInPaise: p.priceInPaise,
+                    fabric: p.fabric,
+                    sizes: p.sizes,
+                    category: p.category,
+                    subcategory: p.subcategory,
+                    stock: p.stock,
+                    featured: p.featured,
+                    images: imgs,
+                  }}
+                />
+              </li>
+            );
+          })}
+          {products.length === 0 && (
+            <p className="text-[var(--muted)]">No products yet.</p>
+          )}
+        </ul>
       </section>
-
       <section className="mt-16">
         <h2 className="font-[family-name:var(--font-display)] text-2xl">
           Add product
         </h2>
-        <form
-          action={createProduct}
-          className="mt-6 grid max-w-xl gap-3 text-sm"
-        >
-          <input
-            name="name"
-            required
-            placeholder="Name"
-            className="border border-[var(--ink)]/20 px-3 py-2"
-          />
-          <input
-            name="slug"
-            required
-            placeholder="slug-like-this"
-            className="border border-[var(--ink)]/20 px-3 py-2"
-          />
-          <textarea
-            name="description"
-            required
-            placeholder="Description"
-            rows={3}
-            className="border border-[var(--ink)]/20 px-3 py-2"
-          />
-          <input
-            name="price"
-            type="number"
-            required
-            placeholder="Price INR"
-            className="border border-[var(--ink)]/20 px-3 py-2"
-          />
-          <input
-            name="fabric"
-            defaultValue="Waffle Cotton"
-            className="border border-[var(--ink)]/20 px-3 py-2"
-          />
-          <input
-            name="image"
-            defaultValue="/products/sky-voyage.png"
-            placeholder="Image path"
-            className="border border-[var(--ink)]/20 px-3 py-2"
-          />
-          <input
-            name="stock"
-            type="number"
-            defaultValue={10}
-            className="border border-[var(--ink)]/20 px-3 py-2"
-          />
-          <label className="flex items-center gap-2">
-            <input type="checkbox" name="featured" /> Featured
-          </label>
-          <button
-            type="submit"
-            className="bg-[var(--ink)] py-2.5 text-white"
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Upload one or more photos (up to 5MB each), then save the product.
+        </p>
+        <AddProductForm catalog={catalog} />
+      </section>
+    </>
+  );
+
+  const ordersPanel = (
+    <section>
+      <h2 className="font-[family-name:var(--font-display)] text-2xl">
+        Recent orders
+      </h2>
+      <ul className="mt-6 space-y-4">
+        {orders.map((o) => (
+          <li
+            key={o.id}
+            className="border border-[var(--line)] bg-[var(--surface)] p-4 text-sm"
           >
-            Create product
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium tracking-wide text-[var(--accent)]">
+                  {displayOrderRef(o)}
+                </p>
+                <p className="mt-1 font-medium">
+                  {o.customerName}{" "}
+                  <span className="font-normal text-[var(--muted)]">
+                    · {formatINR(o.totalInPaise)} ·{" "}
+                    {o.status.replace(/_/g, " ")}
+                  </span>
+                </p>
+                <p className="mt-1 text-[var(--muted)]">
+                  <a
+                    href={`tel:${o.customerPhone}`}
+                    className="hover:text-[var(--accent)]"
+                  >
+                    {o.customerPhone}
+                  </a>
+                  {" · "}
+                  <a
+                    href={`mailto:${o.customerEmail}`}
+                    className="hover:text-[var(--accent)]"
+                  >
+                    {o.customerEmail}
+                  </a>
+                </p>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  {o.addressLine1}
+                  {o.addressLine2 ? `, ${o.addressLine2}` : ""}, {o.city},{" "}
+                  {o.state} {o.pincode}
+                </p>
+                <ul className="mt-2 space-y-0.5 text-xs text-[var(--muted)]">
+                  {o.items.map((item) => (
+                    <li key={item.id}>
+                      {item.product?.name || "Product"} · {item.size}
+                      {item.sheetFit === "elastic"
+                        ? " · Elastic fitted"
+                        : item.sheetFit === "deep"
+                          ? " · Deep Elastic Fitted"
+                          : item.sheetFit === "flat"
+                            ? " · Flat bedsheet"
+                            : ""}
+                      {item.mattress ? ` · Mattress ${item.mattress}` : ""}
+                      {item.customName
+                        ? ` · Name: “${item.customName}”`
+                        : ""}{" "}
+                      × {item.quantity} ·{" "}
+                      {formatINR(item.unitPricePaise * item.quantity)}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[10px] text-[var(--muted)]">
+                  {o.createdAt.toLocaleString("en-IN")}
+                </p>
+                {o.trackingId || o.trackingUrl ? (
+                  <p className="mt-2 text-xs text-[var(--muted)]">
+                    Tracking:{" "}
+                    <span className="text-[var(--ink)]">{o.trackingId}</span>
+                    {o.trackingUrl ? (
+                      <>
+                        {" · "}
+                        <a
+                          href={o.trackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[var(--accent)] hover:underline"
+                        >
+                          Open link
+                        </a>
+                      </>
+                    ) : null}
+                  </p>
+                ) : null}
+                <ShipOrderForm
+                  orderId={o.id}
+                  shareAction={shareTracking}
+                  initialTrackingId={o.trackingId || ""}
+                  initialTrackingUrl={o.trackingUrl || ""}
+                  alreadyShipped={o.status === "shipped"}
+                />
+              </div>
+            </div>
+          </li>
+        ))}
+        {orders.length === 0 && (
+          <p className="text-[var(--muted)]">No orders yet.</p>
+        )}
+      </ul>
+    </section>
+  );
+
+  return (
+    <div className="container-x pb-20 pt-10 md:pt-12">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="section-title">Admin</h1>
+        <form action={logout}>
+          <button type="submit" className="text-sm text-[var(--muted)]">
+            Log out
           </button>
         </form>
-      </section>
-
-      <section className="mt-16">
-        <h2 className="font-[family-name:var(--font-display)] text-2xl">
-          Recent orders
-        </h2>
-        <ul className="mt-6 space-y-4">
-          {orders.map((o) => (
-            <li
-              key={o.id}
-              className="border border-[var(--ink)]/10 p-4 text-sm"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">{o.customerName}</p>
-                  <p className="text-[var(--ink)]/60">
-                    {o.customerEmail} · {formatINR(o.totalInPaise)} ·{" "}
-                    {o.status}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--ink)]/50">
-                    {o.items.length} item(s) · {o.city}, {o.pincode}
-                  </p>
-                </div>
-                {o.status !== "shipped" && (
-                  <form action={markShipped}>
-                    <input type="hidden" name="id" value={o.id} />
-                    <button
-                      type="submit"
-                      className="text-xs text-[var(--ochre)]"
-                    >
-                      Mark shipped
-                    </button>
-                  </form>
-                )}
-              </div>
-            </li>
-          ))}
-          {orders.length === 0 && (
-            <p className="text-[var(--ink)]/50">No orders yet.</p>
-          )}
-        </ul>
-      </section>
+      </div>
+      <p className="mt-3 max-w-2xl text-sm text-[var(--muted)]">
+        Traffic, site content, products, and orders — all in one place.
+      </p>
+      <AdminTabs
+        traffic={traffic}
+        site={site}
+        products={productsPanel}
+        orders={ordersPanel}
+      />
     </div>
   );
 }

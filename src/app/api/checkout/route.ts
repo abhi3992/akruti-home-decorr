@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import Razorpay from "razorpay";
 import { prisma } from "@/lib/prisma";
+import { sendOrderEmails } from "@/lib/notify";
+import { formatINR } from "@/lib/utils";
+import { allocateOrderNumber } from "@/lib/order-number";
+import {
+  formatLineLabel,
+  lineUnitPaise,
+  normalizeCustomName,
+  supportsNamePrint,
+} from "@/lib/name-print";
+import {
+  isBedsheet,
+  normalizeMattress,
+  sheetFitById,
+  sheetFitExtraPaise,
+} from "@/lib/sheet-fit";
 
 const schema = z.object({
   customerName: z.string().min(2),
@@ -18,6 +33,9 @@ const schema = z.object({
         productId: z.string(),
         size: z.string(),
         quantity: z.number().int().positive(),
+        customName: z.string().optional().default(""),
+        sheetFit: z.string().optional().default(""),
+        mattress: z.string().optional().default(""),
       })
     )
     .min(1),
@@ -36,21 +54,51 @@ export async function POST(req: NextRequest) {
     const lineItems = body.items.map((item) => {
       const product = byId.get(item.productId);
       if (!product) throw new Error(`Product not found: ${item.productId}`);
-      totalInPaise += product.priceInPaise * item.quantity;
+
+      const customName = supportsNamePrint(product.category)
+        ? normalizeCustomName(item.customName)
+        : "";
+      if (item.customName?.trim() && !supportsNamePrint(product.category)) {
+        throw new Error(
+          "Name customisation is only available on towels, bathrobes, baby dohars and baby quilts"
+        );
+      }
+
+      const sheetFit = isBedsheet(product.category)
+        ? sheetFitById(item.sheetFit).id
+        : "";
+      const mattress = normalizeMattress(item.mattress, sheetFit);
+      const unitPricePaise =
+        lineUnitPaise(product.priceInPaise, customName, product.category) +
+        sheetFitExtraPaise(product.category, sheetFit);
+      totalInPaise += unitPricePaise * item.quantity;
       return {
         productId: product.id,
         size: item.size,
         quantity: item.quantity,
-        unitPricePaise: product.priceInPaise,
+        unitPricePaise,
+        customName,
+        sheetFit,
+        mattress,
       };
     });
 
-    const keyId = process.env.RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (totalInPaise < 100) {
+      return NextResponse.json(
+        { error: "Order total must be at least ₹1 (100 paise)" },
+        { status: 400 }
+      );
+    }
+
+    const keyId = process.env.RAZORPAY_KEY_ID?.trim();
+    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
     const demoMode = !keyId || !keySecret;
+
+    const orderNumber = await allocateOrderNumber();
 
     const order = await prisma.order.create({
       data: {
+        orderNumber,
         customerName: body.customerName,
         customerEmail: body.customerEmail,
         customerPhone: body.customerPhone,
@@ -65,6 +113,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const publicOrderId = order.orderNumber || order.id;
+
     if (demoMode) {
       for (const item of lineItems) {
         await prisma.product.update({
@@ -72,31 +122,59 @@ export async function POST(req: NextRequest) {
           data: { stock: { decrement: item.quantity } },
         });
       }
+
+      const itemLines = lineItems.map((item) => {
+        const product = byId.get(item.productId)!;
+        return `${formatLineLabel({
+          name: product.name,
+          size: item.size,
+          quantity: item.quantity,
+          customName: item.customName,
+          sheetFit: item.sheetFit,
+          mattress: item.mattress,
+        })} · ${formatINR(item.unitPricePaise * item.quantity)}`;
+      });
+      await sendOrderEmails(order, itemLines);
+
       return NextResponse.json({
         mode: "demo",
-        orderId: order.id,
+        orderId: publicOrderId,
       });
     }
 
-    const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
-    const rzOrder = await razorpay.orders.create({
-      amount: totalInPaise,
-      currency: "INR",
-      receipt: order.id.slice(0, 40),
-    });
+    try {
+      const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+      const rzOrder = await razorpay.orders.create({
+        amount: totalInPaise,
+        currency: "INR",
+        receipt: (order.orderNumber || order.id).slice(0, 40),
+      });
 
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { razorpayOrderId: rzOrder.id },
-    });
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { razorpayOrderId: rzOrder.id },
+      });
 
-    return NextResponse.json({
-      mode: "razorpay",
-      orderId: order.id,
-      razorpayOrderId: rzOrder.id,
-      amount: totalInPaise,
-      keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || keyId,
-    });
+      return NextResponse.json({
+        mode: "razorpay",
+        orderId: publicOrderId,
+        order_id: rzOrder.id,
+        razorpayOrderId: rzOrder.id,
+        amount: totalInPaise,
+        currency: "INR",
+        keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() || keyId,
+      });
+    } catch (rzErr) {
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { status: "payment_failed" },
+      });
+      const message =
+        rzErr instanceof Error ? rzErr.message : "Razorpay order creation failed";
+      const status =
+        /auth|unauthor/i.test(message) || /401/.test(message) ? 401 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Checkout failed";
     return NextResponse.json({ error: message }, { status: 400 });

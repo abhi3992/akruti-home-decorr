@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { normalizeCustomName } from "@/lib/name-print";
 
 export type CartItem = {
   productId: string;
@@ -17,20 +18,51 @@ export type CartItem = {
   size: string;
   priceInPaise: number;
   quantity: number;
+  /** Name-print text on towels/bathrobes; empty when not opted in */
+  customName?: string;
+  /** flat | elastic | deep for bedsheets */
+  sheetFit?: string;
+  /** Mattress length × width × height for fitted sheets */
+  mattress?: string;
 };
+
+type CartLineKey = {
+  productId: string;
+  size: string;
+  customName?: string;
+  sheetFit?: string;
+  mattress?: string;
+};
+
+function lineKey(item: CartLineKey) {
+  return `${item.productId}::${item.size}::${normalizeCustomName(item.customName)}::${item.sheetFit || ""}::${item.mattress || ""}`;
+}
 
 type CartContextValue = {
   items: CartItem[];
   addItem: (item: Omit<CartItem, "quantity">, qty?: number) => void;
-  removeItem: (productId: string, size: string) => void;
-  updateQty: (productId: string, size: string, quantity: number) => void;
+  removeItem: (
+    productId: string,
+    size: string,
+    customName?: string,
+    sheetFit?: string,
+    mattress?: string
+  ) => void;
+  updateQty: (
+    productId: string,
+    size: string,
+    quantity: number,
+    customName?: string,
+    sheetFit?: string,
+    mattress?: string
+  ) => void;
   clearCart: () => void;
   itemCount: number;
   subtotalPaise: number;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
-const STORAGE_KEY = "akruti-cart-v1";
+const STORAGE_KEY = "akruti-cart-v2";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -39,7 +71,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setItems(JSON.parse(raw));
+      if (raw) {
+        const parsed = JSON.parse(raw) as CartItem[];
+        setItems(
+          parsed.map((i) => ({
+            ...i,
+            customName: normalizeCustomName(i.customName),
+          }))
+        );
+      }
     } catch {
       /* ignore */
     }
@@ -53,38 +93,52 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addItem = useCallback(
     (item: Omit<CartItem, "quantity">, qty = 1) => {
+      const customName = normalizeCustomName(item.customName);
+      const incoming = {
+        ...item,
+        customName,
+        sheetFit: item.sheetFit || "",
+        mattress: item.mattress || "",
+      };
       setItems((prev) => {
-        const idx = prev.findIndex(
-          (p) => p.productId === item.productId && p.size === item.size
-        );
+        const idx = prev.findIndex((p) => lineKey(p) === lineKey(incoming));
         if (idx >= 0) {
           const next = [...prev];
           next[idx] = {
             ...next[idx],
             quantity: next[idx].quantity + qty,
+            priceInPaise: incoming.priceInPaise,
           };
           return next;
         }
-        return [...prev, { ...item, quantity: qty }];
+        return [...prev, { ...incoming, quantity: qty }];
       });
     },
     []
   );
 
-  const removeItem = useCallback((productId: string, size: string) => {
-    setItems((prev) =>
-      prev.filter((p) => !(p.productId === productId && p.size === size))
-    );
-  }, []);
+  const removeItem = useCallback(
+    (productId: string, size: string, customName?: string, sheetFit?: string, mattress?: string) => {
+      const key = lineKey({ productId, size, customName, sheetFit, mattress });
+      setItems((prev) => prev.filter((p) => lineKey(p) !== key));
+    },
+    []
+  );
 
   const updateQty = useCallback(
-    (productId: string, size: string, quantity: number) => {
+    (
+      productId: string,
+      size: string,
+      quantity: number,
+      customName?: string,
+      sheetFit?: string,
+      mattress?: string
+    ) => {
+      const key = lineKey({ productId, size, customName, sheetFit, mattress });
       setItems((prev) =>
         prev
           .map((p) =>
-            p.productId === productId && p.size === size
-              ? { ...p, quantity }
-              : p
+            lineKey(p) === key ? { ...p, quantity } : p
           )
           .filter((p) => p.quantity > 0)
       );
